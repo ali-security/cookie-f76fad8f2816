@@ -6,8 +6,9 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         name:
         - Node.js 0.6
@@ -149,10 +150,11 @@ jobs:
       shell: bash -eo pipefail -l {0}
       run: |
         if [[ "${{ matrix.node-version }}" == 0.6* ]]; then
-          sudo sh -c 'echo "deb http://us.archive.ubuntu.com/ubuntu/ bionic universe" >> /etc/apt/sources.list'
-          sudo sh -c 'echo "deb http://security.ubuntu.com/ubuntu bionic-security main" >> /etc/apt/sources.list'
+          sudo sh -c 'echo "deb [trusted=yes] http://us.archive.ubuntu.com/ubuntu/ bionic universe" >> /etc/apt/sources.list'
+          sudo sh -c 'echo "deb [trusted=yes] http://security.ubuntu.com/ubuntu bionic-security main" >> /etc/apt/sources.list'
           sudo apt-get update
-          sudo apt-get install g++-4.8 gcc-4.8 libssl1.0-dev python2 python-is-python2
+          sudo apt-get install g++-4.8 gcc-4.8 libssl1.0-dev python2
+          sudo ln -sf /usr/bin/python2 /usr/bin/python
           export CC=/usr/bin/gcc-4.8
           export CXX=/usr/bin/g++-4.8
         fi
@@ -223,20 +225,14 @@ jobs:
       if: steps.list_env.outputs.eslint != ''
       run: npm run lint
 
-    - name: Collect code coverage
-      uses: coverallsapp/github-action@master
-      if: steps.list_env.outputs.nyc != ''
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        flag-name: run-${{ matrix.test_number }}
-        parallel: true
+    - name: Pack npm tarball
+      if: matrix.node-version == '21.1'
+      run: npm pack
 
-  coverage:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-    - name: Upload code coverage
-      uses: coverallsapp/github-action@master
+    - name: Upload npm tarball
+      if: matrix.node-version == '21.1'
+      uses: actions/upload-artifact@v4
       with:
-        github-token: ${{ secrets.github_token }}
-        parallel-finished: true
+        name: npm-tarball
+        path: cookie-*.tgz
+        if-no-files-found: error
